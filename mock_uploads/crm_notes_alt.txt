@@ -1,0 +1,29 @@
+provider_id: prov-201
+concern_type: workflow
+note_date: 2026-04-20
+note_text: Rep follow-up after regional meeting. Provider said the team loses time compiling fragmented intake notes, biomarker results, and prior treatment context before a short consult.
+
+provider_id: prov-202
+concern_type: clinical-evidence
+note_date: 2026-04-20
+note_text: Department chair wants a concise objection handler grounded in performance metrics that are easy to repeat during an internal budget conversation.
+
+provider_id: prov-203
+concern_type: roi
+note_date: 2026-04-21
+note_text: Service line administrator asked for a pilot story tied to higher-volume thoracic cases and a clear explanation of why the team should prioritize this initiative now.
+
+provider_id: prov-204
+concern_type: integration
+note_date: 2026-04-21
+note_text: Molecular pathology group is open to adoption if the rollout can fit the existing review workflow with minimal disruption to current sign-out processes.
+
+provider_id: prov-205
+concern_type: workflow
+note_date: 2026-04-22
+note_text: Provider wants a thirty-second meeting script focused on reducing prep burden before fast-moving follow-up appointments.
+
+provider_id: prov-206
+concern_type: operations
+note_date: 2026-04-22
+note_text: Community network lead said the main pain point is gathering consistent information across sites before multidisciplinary review.
