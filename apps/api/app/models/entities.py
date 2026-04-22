@@ -1,5 +1,6 @@
 from dataclasses import dataclass, field
 from datetime import date, datetime
+from typing import Any
 
 
 @dataclass
@@ -88,3 +89,17 @@ class GeneratedOutput:
     generation_source: str
     generation_notice: str | None
     created_at: datetime
+
+
+@dataclass
+class EmbeddingResult:
+    vectors: list[list[float]]
+    source: str
+    notice: str | None
+
+
+@dataclass
+class RetrievalResult:
+    snippets: list[Any]
+    source: str
+    notice: str | None

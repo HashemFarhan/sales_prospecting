@@ -1,4 +1,4 @@
-from datetime import date
+from datetime import date, datetime
 
 from pydantic import BaseModel, Field
 
@@ -10,6 +10,7 @@ class ProviderSummary(BaseModel):
     region: str
     size: int
     specialty: str
+    latest_crm_note_date: date | None = None
 
 
 class CRMRecordResponse(BaseModel):
@@ -63,6 +64,18 @@ class KnowledgeSnippet(BaseModel):
     relevance_score: float | None = None
 
 
+class PipelineDiagnostics(BaseModel):
+    embedding_source: str
+    embedding_notice: str | None = None
+    rerank_source: str
+    rerank_notice: str | None = None
+    retrieval_source: str
+    retrieval_notice: str | None = None
+    scoring_source: str
+    generation_source: str
+    generation_notice: str | None = None
+
+
 class ProviderDetail(ProviderSummary):
     crm_records: list[CRMRecordResponse]
     recent_concern_summary: str
@@ -92,6 +105,49 @@ class GeneratedOutputResponse(BaseModel):
     generation_notice: str | None = None
 
 
+class ProviderWorkspaceResponse(BaseModel):
+    provider: ProviderDetail
+    ranking: ProviderRankingResponse
+    top_matched_products: list[ProductMatchResponse]
+    impact: ImpactBreakdown | None = None
+    generated_output: GeneratedOutputResponse | None = None
+    evidence: list[KnowledgeSnippet]
+
+
+class SourceFileSummary(BaseModel):
+    id: str
+    category: str
+    filename: str
+    display_name: str
+    extension: str
+    size_bytes: int
+    updated_at: datetime
+
+
+class SourceFileDetail(SourceFileSummary):
+    view_type: str
+    headers: list[str] = []
+    rows: list[list[str]] = []
+    text_content: str | None = None
+    page_count: int | None = None
+
+
+class SourceListResponse(BaseModel):
+    sources: list[SourceFileSummary]
+
+
+class MeetingScriptRegenerationRequest(BaseModel):
+    feedback: str = Field(min_length=1)
+    current_script: str | None = None
+
+
+class MeetingScriptResponse(BaseModel):
+    provider_id: str
+    meeting_script: str
+    generation_source: str
+    generation_notice: str | None = None
+
+
 class AnalysisResponse(BaseModel):
     provider: ProviderDetail
     ranking: ProviderRankingResponse
@@ -103,6 +159,7 @@ class AnalysisResponse(BaseModel):
     citations: list[str]
     generation_source: str
     generation_notice: str | None = None
+    diagnostics: PipelineDiagnostics
 
 
 class ProviderListResponse(BaseModel):

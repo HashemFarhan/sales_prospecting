@@ -4,7 +4,8 @@ from abc import ABC, abstractmethod
 from collections import defaultdict
 from datetime import datetime
 
-from sqlalchemy import delete, select
+from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy import delete, func, select
 
 from app.db.models import (
     CRMRecordRecord,
@@ -48,6 +49,12 @@ class Repository(ABC):
     def upsert_crm_records(self, records: list[CRMRecord]) -> int: ...
 
     @abstractmethod
+    def replace_provider_dataset(self, providers: list[Provider]) -> int: ...
+
+    @abstractmethod
+    def replace_crm_dataset(self, records: list[CRMRecord]) -> int: ...
+
+    @abstractmethod
     def list_products(self) -> list[ProductSummary]: ...
 
     @abstractmethod
@@ -60,13 +67,21 @@ class Repository(ABC):
     def upsert_products(self, products: list[Product]) -> int: ...
 
     @abstractmethod
+    def replace_product_dataset(self, products: list[Product]) -> int: ...
+
+    @abstractmethod
     def replace_product_chunks_for_products(self, product_ids: list[str], chunks: list[ProductChunk]) -> None: ...
 
     @abstractmethod
     def list_product_chunks(self, product_ids: list[str] | None = None) -> list[ProductChunk]: ...
 
     @abstractmethod
-    def search_product_chunks(self, query_embedding: list[float], product_ids: list[str], limit: int) -> list[ProductChunk]: ...
+    def search_product_chunks(
+        self,
+        query_embedding: list[float],
+        product_ids: list[str],
+        limit: int,
+    ) -> tuple[list[ProductChunk], str, str | None]: ...
 
     @abstractmethod
     def replace_doctor_product_matches(self, provider_id: str, matches: list[DoctorProductMatch]) -> None: ...
@@ -89,12 +104,23 @@ class Repository(ABC):
     @abstractmethod
     def now(self) -> datetime: ...
 
+    @abstractmethod
+    def clear_analysis_cache(self) -> None: ...
+
 
 class SQLAlchemyRepository(Repository):
     def list_providers(self) -> list[ProviderSummary]:
         with SessionLocal() as session:
-            records = session.scalars(select(ProviderRecord).order_by(ProviderRecord.doctor_name)).all()
-            return [_provider_summary(_provider_from_record(record)) for record in records]
+            rows = session.execute(
+                select(ProviderRecord, func.max(CRMRecordRecord.note_date))
+                .outerjoin(CRMRecordRecord, CRMRecordRecord.provider_id == ProviderRecord.id)
+                .group_by(ProviderRecord.id)
+                .order_by(ProviderRecord.doctor_name)
+            ).all()
+            return [
+                _provider_summary(_provider_from_record(record), latest_crm_note_date=latest_crm_note_date)
+                for record, latest_crm_note_date in rows
+            ]
 
     def get_provider(self, provider_id: str) -> Provider | None:
         with SessionLocal() as session:
@@ -131,6 +157,29 @@ class SQLAlchemyRepository(Repository):
             session.commit()
         return len(records)
 
+    def replace_provider_dataset(self, providers: list[Provider]) -> int:
+        incoming_ids = {provider.id for provider in providers}
+        with SessionLocal() as session:
+            existing_ids = set(session.scalars(select(ProviderRecord.id)).all())
+            removed_ids = existing_ids - incoming_ids
+            if removed_ids:
+                session.execute(delete(CRMRecordRecord).where(CRMRecordRecord.provider_id.in_(removed_ids)))
+                session.execute(delete(DoctorProductMatchRecord).where(DoctorProductMatchRecord.provider_id.in_(removed_ids)))
+                session.execute(delete(ImpactRankingRecord).where(ImpactRankingRecord.provider_id.in_(removed_ids)))
+                session.execute(delete(GeneratedOutputRecord).where(GeneratedOutputRecord.provider_id.in_(removed_ids)))
+                session.execute(delete(ProviderRecord).where(ProviderRecord.id.in_(removed_ids)))
+            for provider in providers:
+                session.merge(_provider_record(provider))
+            session.commit()
+        return len(providers)
+
+    def replace_crm_dataset(self, records: list[CRMRecord]) -> int:
+        with SessionLocal() as session:
+            session.execute(delete(CRMRecordRecord))
+            session.add_all([_crm_record_record(record) for record in records])
+            session.commit()
+        return len(records)
+
     def list_products(self) -> list[ProductSummary]:
         with SessionLocal() as session:
             records = session.scalars(select(ProductRecord).order_by(ProductRecord.product_name)).all()
@@ -164,6 +213,15 @@ class SQLAlchemyRepository(Repository):
             session.commit()
         return len(products)
 
+    def replace_product_dataset(self, products: list[Product]) -> int:
+        with SessionLocal() as session:
+            session.execute(delete(ProductChunkRecord))
+            session.execute(delete(DoctorProductMatchRecord))
+            session.execute(delete(ProductRecord))
+            session.add_all([_product_record(product) for product in products])
+            session.commit()
+        return len(products)
+
     def replace_product_chunks_for_products(self, product_ids: list[str], chunks: list[ProductChunk]) -> None:
         if not product_ids:
             return
@@ -180,9 +238,14 @@ class SQLAlchemyRepository(Repository):
             records = session.scalars(stmt).all()
             return [_product_chunk_from_record(record) for record in records]
 
-    def search_product_chunks(self, query_embedding: list[float], product_ids: list[str], limit: int) -> list[ProductChunk]:
+    def search_product_chunks(
+        self,
+        query_embedding: list[float],
+        product_ids: list[str],
+        limit: int,
+    ) -> tuple[list[ProductChunk], str, str | None]:
         if not product_ids:
-            return []
+            return [], "none", None
         with SessionLocal() as session:
             stmt = (
                 select(ProductChunkRecord)
@@ -190,9 +253,22 @@ class SQLAlchemyRepository(Repository):
                 .where(ProductChunkRecord.embedding.is_not(None))
             )
             if session.bind and str(session.bind.url).startswith("postgresql"):
-                stmt = stmt.order_by(ProductChunkRecord.embedding.cosine_distance(query_embedding)).limit(limit)
-                records = session.scalars(stmt).all()
-                return [_product_chunk_from_record(record) for record in records]
+                try:
+                    distance_expr = ProductChunkRecord.__table__.c.embedding.op("<=>")(query_embedding)
+                    records = session.scalars(stmt.order_by(distance_expr).limit(limit)).all()
+                    return [_product_chunk_from_record(record) for record in records], "pgvector", None
+                except (AttributeError, SQLAlchemyError, TypeError, ValueError) as exc:
+                    records = session.scalars(stmt).all()
+                    chunks = [_product_chunk_from_record(record) for record in records]
+                    scored = [
+                        (_cosine_similarity(query_embedding, chunk.embedding), chunk)
+                        for chunk in chunks
+                        if chunk.embedding
+                    ]
+                    scored.sort(key=lambda item: item[0], reverse=True)
+                    return [chunk for _, chunk in scored[:limit]], "postgres-local-cosine", (
+                        f"Fell back from pgvector ordering to local cosine scoring: {type(exc).__name__}."
+                    )
 
             records = session.scalars(stmt).all()
             chunks = [_product_chunk_from_record(record) for record in records]
@@ -202,7 +278,7 @@ class SQLAlchemyRepository(Repository):
                 if chunk.embedding
             ]
             scored.sort(key=lambda item: item[0], reverse=True)
-            return [chunk for _, chunk in scored[:limit]]
+            return [chunk for _, chunk in scored[:limit]], "local-cosine", None
 
     def replace_doctor_product_matches(self, provider_id: str, matches: list[DoctorProductMatch]) -> None:
         with SessionLocal() as session:
@@ -254,8 +330,15 @@ class SQLAlchemyRepository(Repository):
     def now(self) -> datetime:
         return datetime.utcnow()
 
+    def clear_analysis_cache(self) -> None:
+        with SessionLocal() as session:
+            session.execute(delete(DoctorProductMatchRecord))
+            session.execute(delete(ImpactRankingRecord))
+            session.execute(delete(GeneratedOutputRecord))
+            session.commit()
 
-def _provider_summary(provider: Provider) -> ProviderSummary:
+
+def _provider_summary(provider: Provider, latest_crm_note_date=None) -> ProviderSummary:
     return ProviderSummary(
         id=provider.id,
         doctor_name=provider.doctor_name,
@@ -263,6 +346,7 @@ def _provider_summary(provider: Provider) -> ProviderSummary:
         region=provider.region,
         size=provider.size,
         specialty=provider.specialty,
+        latest_crm_note_date=latest_crm_note_date,
     )
 
 
@@ -436,6 +520,7 @@ def _product_from_record(record: ProductRecord) -> Product:
 
 
 def _product_chunk_from_record(record: ProductChunkRecord) -> ProductChunk:
+    embedding = list(record.embedding) if record.embedding is not None else []
     return ProductChunk(
         id=record.id,
         product_id=record.product_id,
@@ -443,7 +528,7 @@ def _product_chunk_from_record(record: ProductChunkRecord) -> ProductChunk:
         chunk_text=record.chunk_text,
         section_title=record.section_title,
         topic=record.topic,
-        embedding=list(record.embedding) if record.embedding else [],
+        embedding=embedding,
         created_at=record.created_at,
     )
 

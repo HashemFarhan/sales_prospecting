@@ -1,0 +1,30 @@
+﻿id,,
+prod-201,SOLID TUMOR + LIQUID BIOPSY,"Maximize biomarker detection and identify more clinically actionable variants linked to targeted therapy options. In a metastatic pan-cancer analysis of 1,448 patients with actionable variants, 9% of patients had unique actionable alterations found in liquid biopsy that were not detected in solid tumor alone."
+prod-202,DNA SEQ + WHOLE TRANSCRIPTOME RNA SEQ,Enable a more complete understanding of clinically actionable fusions and altered splicing. 21% more patients with driver fusions eligible for FDA-approved targeted therapies were identified with DNA + RNA sequencing compared to DNA sequencing alone.
+prod-203,SOLID TUMOR + NORMAL MATCH,"Provides accurate insight through true identification of somatic alterations and maximizes targeted therapy opportunities. 28% reduction in somatic false-positive calls, improving accuracy compared to a tumor-only analysis."
+prod-204,MINIMAL RESIDUAL DISEASE & MONITORING,"Offering a portfolio of MRD and monitoring assays. Finely tuned tumor-naive assay to help detect residual disease or recurrence in colorectal cancer. Ultra sensitive assay to monitor residual disease and recurrence, as well as IO treatment response monitoring."
+prod-205,ROBUST AI CAPABILITIES,"Expansive and developing portfolio of algorithmic testing capabilities and digital pathology platform leveraging 8M+ de-identified research records. Tempus One: the first step toward artificial intelligence enabled genomic reporting, to help you make data-driven precision medicine decisions."
+prod-206,SINGLE PLATFORM SOMATIC + GERMLINE TESTING,Providing a comprehensive view of your patient’s molecular profile. Identify patients with hereditary risk through streamlined cancer testing.
+prod-207,TAILORED TESTING SOLUTIONS,"As part of our genomic sequencing portfolio, Tempus provides a comprehensive selection of tests to help empower you to customize treatment for your patients.
+IHC tests:
+PD-L1 Clones (22C3, 28-8, SP142, SP263)
+MMR (MLH1, MSH2, MSH6, PMS2)
+HER2†
+Available for all solid tumor types, with reflex testing to ERBB2 FISH in cases of equivocal results (IHC score of 2+)‡
+Additional analysis to support HER2 Ultra Low assessment for HER2 breast cancer orders with a score of 0.
+FOLR1 (FRɑ)†
+CLDN18†
+c-MET†
+Neuro-Oncology tests:
+
+1p/19q Co-Deletion†
+MGMT Promoter Methylation†
+Algorithmic tests:
+
+Immune Profile Score (IPS)
+Homologous Recombination Deficiency (HRD)
+Tumor Origin (TO)
+DPYD
+UGT1A1
+PurIST℠"
+prod-208,SIMPLIFIED ORDERING,"Comprehensive Therapy Selection (CTS) streamlines testing for solid tumors and hematologic malignancies, allowing you to easily order tests specific to your patient’s cancer type with one checkbox. Customize testing with add-ons such as liquid biopsy, hereditary testing, and MRD and monitoring assays, while maintaining the flexibility to order individual tests as needed."

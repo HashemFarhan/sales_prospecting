@@ -50,12 +50,14 @@ Copy `.env.example` values into:
 
 ## Notes
 
-- If `OPENAI_API_KEY` is unset, the backend returns deterministic mock output so the case study still demos end to end.
+- The repo now defaults to strict live execution. If live embeddings or OpenAI responses fail, the API returns an explicit error instead of quietly substituting fallback output.
+- Set `ALLOW_MOCK_FALLBACK=true` only when you intentionally want deterministic local fallback behavior for demos.
 - Set `DATABASE_URL` to a managed Postgres connection string for production. The repository switches to SQLAlchemy + pgvector mode automatically when the URL starts with `postgresql`.
 - Set `VECTOR_PROVIDER=pgvector` when you wire in live embeddings and similarity search.
 - Uploaded raw files are stored under `RAW_STORAGE_DIR` and parsed into provider rows, CRM records, or canonical products that are chunked into `product_chunks`.
-- Product chunks now receive embeddings during ingestion. With `OPENAI_API_KEY` set, the app uses real OpenAI embeddings; otherwise it falls back to deterministic local vectors so the retrieval pipeline still works end to end.
+- Product chunks now receive embeddings during ingestion. With `OPENAI_API_KEY` set, the app uses real OpenAI embeddings; without a working live embedding path, ingestion and analysis now fail explicitly unless you opt into `ALLOW_MOCK_FALLBACK=true`.
 - The v2 schema defaults to a fresh local SQLite file so it does not collide with the legacy prototype database. Point `DATABASE_URL` at Supabase Postgres when you are ready for hosted persistence and pgvector.
+- The web UI now includes a Pipeline Status panel so you can verify embedding, reranking, retrieval, and generation sources for each analysis run.
 
 ## Upload formats
 

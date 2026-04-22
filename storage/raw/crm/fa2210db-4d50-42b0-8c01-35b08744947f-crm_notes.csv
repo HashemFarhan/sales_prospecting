@@ -1,0 +1,13 @@
+id,provider_id,note_text,concern_type,note_date
+crm-201,prov-201,"Asked for concrete workflow evidence showing less manual chart review before first consult prep. Wants proof that the team can surface clinically relevant details faster.",workflow,2026-04-08
+crm-202,prov-201,"Interested in whether a pilot can start with high-volume lung and GI cases before a broader rollout.",roi,2026-04-15
+crm-203,prov-202,"Wants stronger evidence for difficult-to-profile cases and clearer positioning for when additional molecular context changes the next step.",clinical-evidence,2026-04-10
+crm-204,prov-202,"Mentioned that the pathology liaison is concerned about disruption during implementation.",integration,2026-04-18
+crm-205,prov-203,"Thoracic team has high patient volume and is evaluating how to prioritize complex cases with limited prep time before visits.",workflow,2026-04-12
+crm-206,prov-203,"Asked whether sales materials can quantify value beyond a generic precision medicine pitch.",roi,2026-04-19
+crm-207,prov-204,"Pathology leadership wants a phased implementation plan that does not interrupt existing specimen review processes.",integration,2026-04-09
+crm-208,prov-204,"Requested a short summary of performance metrics that are easy to share internally with department leadership.",clinical-evidence,2026-04-17
+crm-209,prov-205,"Breast oncology lead wants examples of how better data organization helps during short follow-up visits with newly diagnosed patients.",workflow,2026-04-11
+crm-210,prov-205,"Budget owner asked what the first 90 days of adoption should look like and how to measure success.",roi,2026-04-16
+crm-211,prov-206,"Community site is interested because the team spends significant time gathering fragmented records before tumor board and treatment planning.",operations,2026-04-07
+crm-212,prov-206,"Medical director asked whether onboarding can happen in stages across one service line before expanding to the full network.",integration,2026-04-18

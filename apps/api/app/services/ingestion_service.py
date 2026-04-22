@@ -2,6 +2,7 @@ from datetime import datetime
 from uuid import uuid4
 
 from fastapi import UploadFile
+from sqlalchemy.exc import IntegrityError
 
 from app.models.entities import CRMRecord, Product, ProductChunk, Provider
 from app.schemas.provider import CRMIngestRequest, ProductIngestRequest, ProviderIngestRequest
@@ -9,6 +10,10 @@ from app.services.embedding_service import embedding_service
 from app.services.file_parsing_service import file_parsing_service
 from app.services.repository import repository
 from app.services.storage_service import storage_service
+
+
+class IngestionValidationError(Exception):
+    pass
 
 
 class IngestionService:
@@ -59,21 +64,30 @@ class IngestionService:
 
     async def ingest_provider_upload(self, file: UploadFile) -> int:
         content = await file.read()
-        storage_service.save_upload(file.filename or "providers.csv", content, "providers")
         providers = file_parsing_service.parse_providers_csv(file.filename or "providers.csv", content)
-        return repository.upsert_providers(providers)
+        ingested = repository.replace_provider_dataset(providers)
+        storage_service.replace_upload(file.filename or "providers.csv", content, "providers")
+        repository.clear_analysis_cache()
+        return ingested
 
     async def ingest_crm_upload(self, file: UploadFile) -> int:
         content = await file.read()
-        storage_service.save_upload(file.filename or "crm-records.txt", content, "crm")
         records = file_parsing_service.parse_crm_file(file.filename or "crm-records.txt", content)
-        return repository.upsert_crm_records(records)
+        self._validate_crm_records(records)
+        try:
+            ingested = repository.replace_crm_dataset(records)
+        except IntegrityError as exc:
+            raise self._crm_provider_reference_error(records) from exc
+        storage_service.replace_upload(file.filename or "crm-records.txt", content, "crm")
+        repository.clear_analysis_cache()
+        return ingested
 
     async def ingest_product_upload(self, file: UploadFile) -> int:
         content = await file.read()
-        storage_service.save_upload(file.filename or "products.csv", content, "products")
         products = file_parsing_service.parse_products_file(file.filename or "products.csv", content)
-        return self._store_products_with_chunks(products)
+        ingested = self._replace_products_with_chunks(products)
+        storage_service.replace_upload(file.filename or "products.csv", content, "products")
+        return ingested
 
     def _store_products_with_chunks(self, products: list[Product]) -> int:
         if not products:
@@ -81,6 +95,17 @@ class IngestionService:
         repository.upsert_products(products)
         chunks = self._build_product_chunks(products)
         repository.replace_product_chunks_for_products([product.id for product in products], chunks)
+        return len(products)
+
+    def _replace_products_with_chunks(self, products: list[Product]) -> int:
+        if not products:
+            repository.replace_product_dataset([])
+            repository.clear_analysis_cache()
+            return 0
+        chunks = self._build_product_chunks(products)
+        repository.replace_product_dataset(products)
+        repository.replace_product_chunks_for_products([product.id for product in products], chunks)
+        repository.clear_analysis_cache()
         return len(products)
 
     def _build_product_chunks(self, products: list[Product]) -> list[ProductChunk]:
@@ -126,3 +151,19 @@ class IngestionService:
             if topic.replace("-", " ") in lowered or topic in lowered:
                 return topic
         return "product-fit"
+
+    def _validate_crm_records(self, records: list[CRMRecord]) -> None:
+        provider_ids = {provider.id for provider in repository.list_providers()}
+        missing_provider_ids = sorted({record.provider_id for record in records if record.provider_id not in provider_ids})
+        if missing_provider_ids:
+            raise self._crm_provider_reference_error(records)
+
+    def _crm_provider_reference_error(self, records: list[CRMRecord]) -> IngestionValidationError:
+        provider_ids = {provider.id for provider in repository.list_providers()}
+        missing_provider_ids = sorted({record.provider_id for record in records if record.provider_id not in provider_ids})
+        missing_preview = ", ".join(missing_provider_ids[:8]) if missing_provider_ids else "unknown provider IDs"
+        suffix = "..." if len(missing_provider_ids) > 8 else ""
+        return IngestionValidationError(
+            "CRM upload references provider IDs that are not in the active providers dataset: "
+            f"{missing_preview}{suffix}. Upload the matching providers file first."
+        )

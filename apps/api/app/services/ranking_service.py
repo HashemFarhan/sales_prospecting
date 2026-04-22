@@ -11,6 +11,7 @@ from app.services.repository import repository
 class RankingService:
     def __init__(self) -> None:
         self.openai_service = OpenAIService()
+        self.last_run_diagnostics: dict[str, dict[str, str | None]] = {}
 
     def rank_providers(self, selected_provider_id: str) -> ProviderRankingResponse | None:
         providers = [repository.get_provider(item.id) for item in repository.list_providers()]
@@ -28,14 +29,24 @@ class RankingService:
             }
             for product in products
         ]
-        product_embeddings = embedding_service.embed_texts([payload["comparison_text"] for payload in product_payloads]) if product_payloads else []
+        product_embedding_result = (
+            embedding_service.embed_texts_with_metadata([payload["comparison_text"] for payload in product_payloads])
+            if product_payloads
+            else None
+        )
+        product_embeddings = product_embedding_result.vectors if product_embedding_result else []
+        embedding_source = product_embedding_result.source if product_embedding_result else "none"
+        embedding_notice = product_embedding_result.notice if product_embedding_result else None
 
         raw_scores: list[dict] = []
         for provider in providers:
             detail = repository.get_provider_detail(provider.id)
             if detail is None:
                 continue
-            provider_embedding = embedding_service.embed_text(detail.interest_profile)
+            provider_embedding_result = embedding_service.embed_text_with_metadata(detail.interest_profile)
+            provider_embedding = provider_embedding_result.vectors[0]
+            embedding_source = provider_embedding_result.source
+            embedding_notice = provider_embedding_result.notice or embedding_notice
             candidate_scores = []
             for payload, product_embedding in zip(product_payloads, product_embeddings):
                 similarity = self._cosine_similarity(provider_embedding, product_embedding)
@@ -90,10 +101,22 @@ class RankingService:
                     "size": provider.size,
                     "match_source": reranked["evaluation_source"],
                     "match_notice": reranked.get("evaluation_notice"),
+                    "embedding_source": embedding_source,
+                    "embedding_notice": embedding_notice,
                 }
             )
 
         self._persist_rankings(raw_scores)
+        self.last_run_diagnostics = {
+            item["provider"].id: {
+                "embedding_source": str(item["embedding_source"]),
+                "embedding_notice": item["embedding_notice"],
+                "rerank_source": str(item["match_source"]),
+                "rerank_notice": item["match_notice"],
+                "scoring_source": "weighted-impact",
+            }
+            for item in raw_scores
+        }
         ranked_providers = [
             RankedProvider(
                 provider_id=item["provider"].id,
@@ -105,6 +128,18 @@ class RankingService:
             for item in sorted(raw_scores, key=lambda row: row["impact_score"], reverse=True)
         ]
         return ProviderRankingResponse(selected_provider_id=selected_provider_id, ranked_providers=ranked_providers)
+
+    def get_last_run_diagnostics(self, provider_id: str) -> dict[str, str | None]:
+        return self.last_run_diagnostics.get(
+            provider_id,
+            {
+                "embedding_source": "unknown",
+                "embedding_notice": "No ranking diagnostics are available for this provider yet.",
+                "rerank_source": "unknown",
+                "rerank_notice": None,
+                "scoring_source": "weighted-impact",
+            },
+        )
 
     def _persist_rankings(self, raw_scores: list[dict]) -> None:
         if not raw_scores:

@@ -5,6 +5,7 @@ export type ProviderSummary = {
   region: string;
   size: number;
   specialty: string;
+  latest_crm_note_date?: string | null;
 };
 
 export type CRMRecord = {
@@ -57,6 +58,18 @@ export type KnowledgeSnippet = {
   relevance_score?: number | null;
 };
 
+export type PipelineDiagnostics = {
+  embedding_source: string;
+  embedding_notice?: string | null;
+  rerank_source: string;
+  rerank_notice?: string | null;
+  retrieval_source: string;
+  retrieval_notice?: string | null;
+  scoring_source: string;
+  generation_source: string;
+  generation_notice?: string | null;
+};
+
 export type RankedProvider = {
   provider_id: string;
   doctor_name: string;
@@ -79,6 +92,51 @@ export type AnalysisResponse = {
   meeting_script: string;
   evidence: KnowledgeSnippet[];
   citations: string[];
+  generation_source: string;
+  generation_notice?: string | null;
+  diagnostics: PipelineDiagnostics;
+};
+
+export type GeneratedOutputResponse = {
+  provider_id: string;
+  top_product_ids: string[];
+  objection_handler: string;
+  meeting_script: string;
+  supporting_snippets: string[];
+  generation_source: string;
+  generation_notice?: string | null;
+};
+
+export type ProviderWorkspaceResponse = {
+  provider: ProviderDetail;
+  ranking: ProviderRankingResponse;
+  top_matched_products: ProductMatch[];
+  impact?: ImpactBreakdown | null;
+  generated_output?: GeneratedOutputResponse | null;
+  evidence: KnowledgeSnippet[];
+};
+
+export type SourceFileSummary = {
+  id: string;
+  category: string;
+  filename: string;
+  display_name: string;
+  extension: string;
+  size_bytes: number;
+  updated_at: string;
+};
+
+export type SourceFileDetail = SourceFileSummary & {
+  view_type: "table" | "json" | "markdown" | "pdf" | "text";
+  headers: string[];
+  rows: string[][];
+  text_content?: string | null;
+  page_count?: number | null;
+};
+
+export type MeetingScriptResponse = {
+  provider_id: string;
+  meeting_script: string;
   generation_source: string;
   generation_notice?: string | null;
 };

@@ -1,70 +1,35 @@
 "use client";
 
-import { ReactNode, useEffect, useState, useTransition } from "react";
-import { AlertCircle, Building2, FileText, Gauge, MessageSquareQuote, Package2, Sparkles, Upload } from "lucide-react";
+import Link from "next/link";
+import { useEffect, useMemo, useState, useTransition } from "react";
+import { ArrowRight, Building2, Database, UploadCloud } from "lucide-react";
 
-import { analyzeProvider, getProviders, uploadIngestionFile } from "@/lib/api";
-import { AnalysisResponse, ProviderSummary } from "@/lib/types";
+import { getProviders, uploadIngestionFile } from "@/lib/api";
+import { ProviderSummary } from "@/lib/types";
+import { AnimatedCounter, formatDate, formatNumber, getPriorityTone, ProviderDrawerItem, StatCard, TopNavigation, UploadPanel } from "@/components/provider-ui";
+import { WorkspaceSidebar } from "@/components/workspace-sidebar";
 
-function SectionCard(props: { title: string; icon: ReactNode; children: ReactNode; className?: string }) {
-  return (
-    <section className={`glass rounded-3xl border border-white/60 p-6 shadow-card ${props.className ?? ""}`}>
-      <div className="mb-4 flex items-center gap-3">
-        <div className="rounded-2xl bg-sky/80 p-2 text-teal">{props.icon}</div>
-        <h2 className="text-lg font-semibold text-ink">{props.title}</h2>
-      </div>
-      {props.children}
-    </section>
-  );
-}
+type UploadKind = "providers" | "crm-notes" | "products";
 
 export function Dashboard() {
   const [providers, setProviders] = useState<ProviderSummary[]>([]);
-  const [selectedProviderId, setSelectedProviderId] = useState<string>("");
-  const [analysis, setAnalysis] = useState<AnalysisResponse | null>(null);
-  const [error, setError] = useState<string>("");
-  const [uploadMessage, setUploadMessage] = useState<string>("");
   const [providerFile, setProviderFile] = useState<File | null>(null);
   const [crmFile, setCrmFile] = useState<File | null>(null);
   const [productFile, setProductFile] = useState<File | null>(null);
-  const [isPending, startTransition] = useTransition();
+  const [error, setError] = useState("");
+  const [uploadMessage, setUploadMessage] = useState("");
   const [isUploading, startUploadTransition] = useTransition();
 
-  async function loadProviders(preserveSelected = true) {
+  async function loadProviders() {
     const items = await getProviders();
     setProviders(items);
-    if (items.length === 0) {
-      setSelectedProviderId("");
-      return;
-    }
-    if (preserveSelected && items.some((item) => item.id === selectedProviderId)) {
-      return;
-    }
-    setSelectedProviderId(items[0].id);
   }
 
   useEffect(() => {
-    void loadProviders(false).catch(() => setError("Unable to load providers from the API."));
+    void loadProviders().catch(() => setError("Unable to load providers from the API."));
   }, []);
 
-  useEffect(() => {
-    if (!selectedProviderId) {
-      return;
-    }
-    startTransition(() => {
-      void (async () => {
-        try {
-          setError("");
-          const payload = await analyzeProvider(selectedProviderId);
-          setAnalysis(payload);
-        } catch {
-          setError("Unable to generate provider analysis right now.");
-        }
-      })();
-    });
-  }, [selectedProviderId]);
-
-  function handleUpload(kind: "providers" | "crm-notes" | "products", file: File | null) {
+  function handleUpload(kind: UploadKind, file: File | null) {
     if (!file) {
       setUploadMessage(`Choose a file for ${kind} first.`);
       return;
@@ -73,236 +38,190 @@ export function Dashboard() {
       void (async () => {
         try {
           setError("");
+          setUploadMessage("");
           const result = await uploadIngestionFile(kind, file);
-          setUploadMessage(`Ingested ${result.ingested} records from ${file.name}.`);
-          await loadProviders(false);
-        } catch {
-          setError(`Unable to ingest ${file.name}.`);
+          setUploadMessage(`Replaced the active ${kind} dataset with ${result.ingested} records from ${file.name}.`);
+          await loadProviders();
+        } catch (caughtError) {
+          const message = caughtError instanceof Error ? caughtError.message : `Unable to ingest ${file.name}.`;
+          setError(message);
         }
       })();
     });
   }
 
+  const filteredProviders = useMemo(() => {
+    const items: ProviderDrawerItem[] = providers.map((provider, index) => ({
+      ...provider,
+      rank: index
+    }));
+    return items;
+  }, [providers]);
+
+  const highPriorityCount = filteredProviders.filter((provider) => getPriorityTone(provider).label === "High Priority").length;
+
   return (
-    <main className="mx-auto flex min-h-screen max-w-7xl flex-col gap-6 px-4 py-8 sm:px-6 lg:px-8">
-      <section className="glass overflow-hidden rounded-[2rem] border border-white/70 p-8 shadow-card">
-        <div className="flex flex-col gap-8 lg:flex-row lg:items-end lg:justify-between">
-          <div className="max-w-3xl space-y-4">
-            <span className="inline-flex items-center gap-2 rounded-full bg-white/70 px-4 py-2 text-sm font-medium text-teal">
-              <Sparkles className="h-4 w-4" />
-              Tempus Sales Copilot
-            </span>
-            <h1 className="max-w-2xl text-4xl font-semibold tracking-tight text-ink sm:text-5xl">
-              Rank prospects by doctor-product fit, account size, and grounded evidence.
-            </h1>
-            <p className="max-w-2xl text-base leading-7 text-slate-600">
-              The app combines provider records, CRM interests, and canonical product knowledge to identify the highest-impact accounts and the best product angle for outreach.
-            </p>
+    <main className="min-h-screen bg-white text-slate-950">
+      <TopNavigation
+        providers={providers}
+        action={
+          <div className="rounded-full border border-black bg-black px-4 py-2 text-sm text-white">
+            Internal Tool
           </div>
+        }
+      />
 
-          <div className="w-full max-w-sm rounded-3xl bg-ink p-5 text-white">
-            <label className="mb-2 block text-sm font-medium text-sky-100">Target provider</label>
-            <select
-              value={selectedProviderId}
-              onChange={(event) => setSelectedProviderId(event.target.value)}
-              className="w-full rounded-2xl border border-white/10 bg-slate-900 px-4 py-3 text-sm outline-none ring-0"
-            >
-              {providers.map((provider) => (
-                <option key={provider.id} value={provider.id}>
-                  {provider.doctor_name} | {provider.clinic_or_hospital}
-                </option>
-              ))}
-            </select>
-            <p className="mt-3 text-sm text-slate-300">Switch accounts to rerun product matching and impact scoring instantly.</p>
-          </div>
-        </div>
-      </section>
+      <div className="flex w-full flex-col pt-[88px] xl:flex-row">
+        <WorkspaceSidebar />
 
-      {error ? (
-        <div className="flex items-center gap-3 rounded-2xl border border-red-200 bg-red-50 px-4 py-3 text-sm text-red-700">
-          <AlertCircle className="h-4 w-4" />
-          {error}
-        </div>
-      ) : null}
+        <section className="min-w-0 flex-1 bg-white p-6 xl:ml-[280px] xl:p-8">
+          {error ? (
+            <div className="rounded-[0.9rem] border border-red-300 bg-white px-4 py-3 text-sm text-red-700">{error}</div>
+          ) : null}
 
-      {uploadMessage ? (
-        <div className="rounded-2xl border border-emerald-200 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">{uploadMessage}</div>
-      ) : null}
+          {uploadMessage ? (
+            <div className="mt-4 rounded-[0.9rem] border border-slate-300 bg-white px-4 py-3 text-sm text-slate-700">{uploadMessage}</div>
+          ) : null}
 
-      <div className="grid gap-6 lg:grid-cols-3">
-        <SectionCard title="Providers Upload" icon={<Upload className="h-5 w-5" />}>
-          <div className="space-y-4">
-            <p className="text-sm leading-6 text-slate-600">Upload a CSV with `doctor_name`, `clinic_or_hospital`, `region`, `size`, and `specialty`.</p>
-            <input type="file" accept=".csv" onChange={(event) => setProviderFile(event.target.files?.[0] ?? null)} />
-            <button onClick={() => handleUpload("providers", providerFile)} className="rounded-2xl bg-ink px-4 py-3 text-sm font-medium text-white disabled:opacity-50" disabled={isUploading}>
-              Upload providers
-            </button>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="CRM Upload" icon={<MessageSquareQuote className="h-5 w-5" />}>
-          <div className="space-y-4">
-            <p className="text-sm leading-6 text-slate-600">Upload CRM records as CSV or TXT with `concern`, `interest_text`, and `note_text`.</p>
-            <input type="file" accept=".csv,.txt" onChange={(event) => setCrmFile(event.target.files?.[0] ?? null)} />
-            <button onClick={() => handleUpload("crm-notes", crmFile)} className="rounded-2xl bg-ink px-4 py-3 text-sm font-medium text-white disabled:opacity-50" disabled={isUploading}>
-              Upload CRM
-            </button>
-          </div>
-        </SectionCard>
-
-        <SectionCard title="Products Upload" icon={<Package2 className="h-5 w-5" />}>
-          <div className="space-y-4">
-            <p className="text-sm leading-6 text-slate-600">Upload canonical products as CSV, JSON, Markdown, TXT, or PDF. Product details will be chunked and embedded automatically.</p>
-            <input type="file" accept=".csv,.json,.md,.txt,.pdf" onChange={(event) => setProductFile(event.target.files?.[0] ?? null)} />
-            <button onClick={() => handleUpload("products", productFile)} className="rounded-2xl bg-ink px-4 py-3 text-sm font-medium text-white disabled:opacity-50" disabled={isUploading}>
-              Upload products
-            </button>
-          </div>
-        </SectionCard>
-      </div>
-
-      <div className="grid gap-6 lg:grid-cols-[1.05fr,0.95fr]">
-        <SectionCard title="Provider Snapshot" icon={<Building2 className="h-5 w-5" />}>
-          {analysis ? (
-            <div className="space-y-5">
-              <div className="flex flex-wrap gap-3">
-                <div className="rounded-2xl bg-slate-900 px-4 py-3 text-white">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Clinic / Hospital</div>
-                  <div className="mt-1 font-medium">{analysis.provider.clinic_or_hospital}</div>
-                </div>
-                <div className="rounded-2xl bg-white px-4 py-3">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Region</div>
-                  <div className="mt-1 font-medium text-ink">{analysis.provider.region}</div>
-                </div>
-                <div className="rounded-2xl bg-white px-4 py-3">
-                  <div className="text-xs uppercase tracking-[0.2em] text-slate-400">Size</div>
-                  <div className="mt-1 font-medium text-ink">{analysis.provider.size}</div>
-                </div>
-              </div>
-              <div className="rounded-2xl bg-sand p-4 text-sm leading-7 text-ember">{analysis.provider.recent_concern_summary}</div>
-              <div className="rounded-2xl bg-white p-4 text-sm leading-7 text-slate-700">
-                <div className="mb-2 text-xs uppercase tracking-[0.18em] text-slate-400">Interest Profile</div>
-                {analysis.provider.interest_profile}
-              </div>
-              <div className="space-y-3">
-                {analysis.provider.crm_records.map((record) => (
-                  <article key={record.id} className="rounded-2xl border border-slate-200 bg-white p-4">
-                    <div className="mb-2 flex items-center justify-between text-xs uppercase tracking-[0.18em] text-slate-400">
-                      <span>{record.concern}</span>
-                      <span>{record.note_date}</span>
-                    </div>
-                    <p className="text-sm font-medium leading-6 text-slate-700">{record.interest_text}</p>
-                    <p className="mt-2 text-sm leading-6 text-slate-600">{record.note_text}</p>
-                  </article>
-                ))}
-              </div>
-            </div>
-          ) : (
-            <p className="text-sm text-slate-500">{isPending ? "Analyzing provider..." : "Select a provider to begin."}</p>
-          )}
-        </SectionCard>
-
-        <div className="space-y-6">
-          <SectionCard title="Impact Breakdown" icon={<Gauge className="h-5 w-5" />}>
-            {analysis ? (
+          <div className="flex flex-col gap-6">
+            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
               <div className="space-y-4">
-                <div className="grid gap-3 sm:grid-cols-2">
-                  <div className="rounded-2xl bg-white p-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Impact Score</div>
-                    <div className="mt-2 text-2xl font-semibold text-ink">{analysis.impact.impact_score.toFixed(4)}</div>
-                  </div>
-                  <div className="rounded-2xl bg-white p-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Relevant Products</div>
-                    <div className="mt-2 text-2xl font-semibold text-ink">{analysis.impact.relevant_product_count}</div>
-                  </div>
-                  <div className="rounded-2xl bg-white p-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Similarity Sum</div>
-                    <div className="mt-2 text-2xl font-semibold text-ink">{analysis.impact.similarity_sum.toFixed(2)}</div>
-                  </div>
-                  <div className="rounded-2xl bg-white p-4">
-                    <div className="text-xs uppercase tracking-[0.18em] text-slate-400">Mean LLM Score</div>
-                    <div className="mt-2 text-2xl font-semibold text-ink">{analysis.impact.mean_llm_relevance_score.toFixed(2)}</div>
-                  </div>
+                <div className="grid gap-3 lg:grid-cols-3">
+                  <StatCard
+                    label="Providers"
+                    value={<AnimatedCounter value={providers.length} formatter={(value) => formatNumber(Math.round(value))} />}
+                    helper="All records currently loaded."
+                    inverse
+                  />
+                  <StatCard
+                    label="High Priority"
+                    value={<AnimatedCounter value={highPriorityCount} formatter={(value) => formatNumber(Math.round(value))} />}
+                    helper="Based on queue position."
+                    inverse
+                  />
+                  <StatCard
+                    label="Latest Activity"
+                    value={providers[0] ? formatDate(providers[0].latest_crm_note_date) : "No data"}
+                    helper="Freshest CRM note across the queue."
+                    inverse
+                  />
                 </div>
-                <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-700">{analysis.impact.rank_reasoning}</p>
-                {analysis.impact.match_notice ? <p className="text-sm leading-6 text-amber-700">{analysis.impact.match_notice}</p> : null}
-              </div>
-            ) : (
-              <p className="text-sm text-slate-500">Impact details will appear after analysis.</p>
-            )}
-          </SectionCard>
 
-          <SectionCard title="Top Matched Products" icon={<Package2 className="h-5 w-5" />}>
-            <div className="space-y-3">
-              {analysis?.top_matched_products.map((match) => (
-                <article key={match.product_id} className="rounded-2xl border border-slate-200 bg-white p-4">
-                  <div className="mb-2 flex items-center justify-between">
+                <section className="rounded-[0.9rem] border border-slate-300 bg-white">
+                  <div className="flex items-center justify-between border-b border-slate-300 px-5 py-4">
                     <div>
-                      <div className="text-sm font-semibold text-ink">{match.product_name}</div>
-                      <div className="text-sm text-slate-500">{match.llm_relevance_label}</div>
+                      <div className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Providers</div>
+                      <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Queue</h2>
                     </div>
-                    <div className="rounded-full bg-slate-900 px-3 py-1 text-sm font-medium text-white">{match.llm_relevance_score.toFixed(2)}</div>
+                    <div className="text-sm text-slate-500">{filteredProviders.length} visible</div>
                   </div>
-                  <p className="text-sm leading-6 text-slate-600">{match.description}</p>
-                  <p className="mt-2 text-sm leading-6 text-slate-700">{match.llm_reasoning}</p>
-                  <div className="mt-3 text-xs uppercase tracking-[0.16em] text-slate-400">Semantic {match.interest_embedding_similarity.toFixed(3)} | {match.evaluation_source}</div>
-                </article>
-              )) ?? <p className="text-sm text-slate-500">Matched products will appear after analysis.</p>}
-            </div>
-          </SectionCard>
-        </div>
-      </div>
 
-      <SectionCard title="Ranked Provider List" icon={<Gauge className="h-5 w-5" />}>
-        <div className="grid gap-4 lg:grid-cols-3">
-          {analysis?.ranking.ranked_providers.map((item, index) => (
-            <article key={item.provider_id} className={`rounded-2xl border p-4 ${item.provider_id === analysis.ranking.selected_provider_id ? "border-teal bg-teal/5" : "border-slate-200 bg-white"}`}>
-              <div className="mb-2 flex items-center justify-between">
-                <div>
-                  <div className="text-sm font-semibold text-ink">#{index + 1} {item.doctor_name}</div>
-                  <div className="text-sm text-slate-500">{item.clinic_or_hospital}</div>
+                  <div className="space-y-0">
+                    {filteredProviders.map((provider) => {
+                      const priority = getPriorityTone(provider);
+                      return (
+                        <Link
+                          key={provider.id}
+                          href={`/providers/${provider.id}`}
+                          className="block border-b border-slate-300 px-5 py-5 transition last:border-b-0 hover:bg-slate-50"
+                        >
+                          <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-center 2xl:justify-between">
+                            <div className="min-w-0">
+                              <div className="flex flex-wrap items-center gap-3">
+                                <Building2 className="h-4 w-4 text-black" />
+                                <h3 className="text-lg font-semibold tracking-tight text-slate-950">{provider.doctor_name}</h3>
+                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${priority.tagClassName}`}>
+                                  {priority.label}
+                                </span>
+                              </div>
+                              <p className="mt-2 text-sm text-slate-500">{provider.clinic_or_hospital}</p>
+                            </div>
+
+                            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                              <div>
+                                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Last Note</div>
+                                <div className="mt-1 text-sm font-medium text-slate-900">{formatDate(provider.latest_crm_note_date)}</div>
+                              </div>
+                              <div>
+                                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Region</div>
+                                <div className="mt-1 text-sm font-medium text-slate-900">{provider.region}</div>
+                              </div>
+                              <div>
+                                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Specialty</div>
+                                <div className="mt-1 text-sm font-medium text-slate-900">{provider.specialty}</div>
+                              </div>
+                              <div>
+                                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Size</div>
+                                <div className="mt-1 text-sm font-medium text-slate-900">{formatNumber(provider.size)}</div>
+                              </div>
+                              <div className="flex items-center justify-between gap-3 xl:justify-end">
+                                <div>
+                                  <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Open</div>
+                                  <div className="mt-1 text-sm font-medium text-slate-900">View details</div>
+                                </div>
+                                <ArrowRight className="h-4 w-4 text-black" />
+                              </div>
+                            </div>
+                          </div>
+                        </Link>
+                      );
+                    })}
+
+                    {filteredProviders.length === 0 ? (
+                      <div className="px-5 py-10 text-center text-sm text-slate-500">No providers matched that search.</div>
+                    ) : null}
+                  </div>
+                </section>
+              </div>
+
+              <aside className="rounded-[0.9rem] border border-slate-300 bg-white p-5">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <div className="text-sm font-medium text-slate-950">Data Intake</div>
+                    <p className="mt-1 text-sm text-slate-500">Manage imports from the queue view.</p>
+                  </div>
+                  <UploadCloud className="h-5 w-5 text-black" />
                 </div>
-                <div className="rounded-full bg-slate-900 px-3 py-1 text-sm font-medium text-white">{item.impact_score.toFixed(4)}</div>
-              </div>
-              <p className="text-sm leading-6 text-slate-600">{item.rank_reasoning}</p>
-            </article>
-          )) ?? <p className="text-sm text-slate-500">Provider rankings will appear after analysis.</p>}
-        </div>
-      </SectionCard>
 
-      <div className="grid gap-6 lg:grid-cols-2">
-        <SectionCard title="Objection Handler" icon={<MessageSquareQuote className="h-5 w-5" />}>
-          {analysis ? (
-            <div className="space-y-4">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className={`rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${analysis.generation_source === "live" ? "bg-emerald-100 text-emerald-700" : "bg-amber-100 text-amber-700"}`}>
-                  {analysis.generation_source === "live" ? "Live OpenAI Output" : "Fallback Draft"}
-                </span>
-              </div>
-              {analysis.generation_notice ? <p className="rounded-2xl bg-slate-50 px-4 py-3 text-sm leading-6 text-slate-600">{analysis.generation_notice}</p> : null}
-              <p className="text-sm leading-7 text-slate-700">{analysis.objection_handler}</p>
+                <div className="mt-5 space-y-4">
+                  <UploadPanel
+                    title="Providers"
+                    hint="CSV with doctor_name, clinic_or_hospital, region, size, and specialty."
+                    accept=".csv"
+                    disabled={isUploading}
+                    onSelect={setProviderFile}
+                    onUpload={() => handleUpload("providers", providerFile)}
+                  />
+                  <UploadPanel
+                    title="CRM Notes"
+                    hint="CSV or TXT with concern, interest_text, and note_text."
+                    accept=".csv,.txt"
+                    disabled={isUploading}
+                    onSelect={setCrmFile}
+                    onUpload={() => handleUpload("crm-notes", crmFile)}
+                  />
+                  <UploadPanel
+                    title="Products"
+                    hint="CSV, JSON, Markdown, TXT, or PDF for canonical product knowledge."
+                    accept=".csv,.json,.md,.txt,.pdf"
+                    disabled={isUploading}
+                    onSelect={setProductFile}
+                    onUpload={() => handleUpload("products", productFile)}
+                  />
+                </div>
+
+                <div className="mt-5 rounded-[0.9rem] border border-black bg-black p-4 text-white">
+                  <div className="flex items-center gap-2 text-sm font-medium">
+                    <Database className="h-4 w-4" />
+                    Workspace Notes
+                  </div>
+                  <p className="mt-3 text-sm leading-6 text-slate-300">Use the queue to review providers, then open a record for CRM notes, objections, pitch, score, and product fit.</p>
+                </div>
+              </aside>
             </div>
-          ) : (
-            <p className="text-sm leading-7 text-slate-700">Waiting for generated response.</p>
-          )}
-        </SectionCard>
-
-        <SectionCard title="30-Second Meeting Script" icon={<FileText className="h-5 w-5" />}>
-          <p className="text-sm leading-7 text-slate-700">{analysis?.meeting_script ?? "Waiting for generated response."}</p>
-        </SectionCard>
+          </div>
+        </section>
       </div>
-
-      <SectionCard title="Grounding Evidence" icon={<Sparkles className="h-5 w-5" />}>
-        <div className="grid gap-4 lg:grid-cols-3">
-          {analysis?.evidence.map((snippet) => (
-            <article key={snippet.id} className="rounded-2xl border border-slate-200 bg-white p-5">
-              <div className="mb-3 text-xs uppercase tracking-[0.18em] text-slate-400">{snippet.topic} | {snippet.section_title}</div>
-              <p className="text-sm leading-8 text-slate-700 [text-wrap:pretty]">{snippet.display_text ?? snippet.chunk_text}</p>
-              <div className="mt-4 text-xs font-medium text-teal">{snippet.source_document}</div>
-            </article>
-          )) ?? <p className="text-sm text-slate-500">Evidence will appear after analysis.</p>}
-        </div>
-      </SectionCard>
     </main>
   );
 }

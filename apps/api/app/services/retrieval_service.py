@@ -1,20 +1,41 @@
 import re
 
+from app.models.entities import RetrievalResult
 from app.schemas.provider import KnowledgeSnippet
 from app.services.embedding_service import embedding_service
 from app.services.repository import repository
 
 
 class RetrievalService:
-    def retrieve_for_provider(self, provider_id: str, product_ids: list[str], limit: int = 3) -> list[KnowledgeSnippet]:
+    def retrieve_for_provider(self, provider_id: str, product_ids: list[str], limit: int = 3) -> RetrievalResult:
         provider = repository.get_provider_detail(provider_id)
         if provider is None or not product_ids:
-            return []
+            return RetrievalResult(snippets=[], source="none", notice=None)
 
-        query_embedding = embedding_service.embed_text(provider.interest_profile)
-        semantic_matches = repository.search_product_chunks(query_embedding, product_ids, limit * 3)
+        embedding_result = embedding_service.embed_text_with_metadata(provider.interest_profile)
+        query_embedding = embedding_result.vectors[0]
+        semantic_matches, search_source, search_notice = repository.search_product_chunks(query_embedding, product_ids, limit * 3)
         if semantic_matches:
-            return [
+            return RetrievalResult(
+                snippets=[
+                    KnowledgeSnippet(
+                        id=chunk.id,
+                        product_id=chunk.product_id,
+                        source_document=chunk.source_document,
+                        section_title=chunk.section_title,
+                        topic=chunk.topic,
+                        chunk_text=chunk.chunk_text,
+                        display_text=self._format_display_text(chunk.chunk_text),
+                        relevance_score=1.0,
+                    )
+                    for chunk in semantic_matches[:limit]
+                ],
+                source=f"{embedding_result.source}+{search_source}",
+                notice=embedding_result.notice or search_notice,
+            )
+
+        return RetrievalResult(
+            snippets=[
                 KnowledgeSnippet(
                     id=chunk.id,
                     product_id=chunk.product_id,
@@ -23,24 +44,13 @@ class RetrievalService:
                     topic=chunk.topic,
                     chunk_text=chunk.chunk_text,
                     display_text=self._format_display_text(chunk.chunk_text),
-                    relevance_score=1.0,
+                    relevance_score=0.0,
                 )
-                for chunk in semantic_matches[:limit]
-            ]
-
-        return [
-            KnowledgeSnippet(
-                id=chunk.id,
-                product_id=chunk.product_id,
-                source_document=chunk.source_document,
-                section_title=chunk.section_title,
-                topic=chunk.topic,
-                chunk_text=chunk.chunk_text,
-                display_text=self._format_display_text(chunk.chunk_text),
-                relevance_score=0.0,
-            )
-            for chunk in repository.list_product_chunks(product_ids)[:limit]
-        ]
+                for chunk in repository.list_product_chunks(product_ids)[:limit]
+            ],
+            source=f"{embedding_result.source}+document-order",
+            notice=embedding_result.notice or "No semantic chunk matches were returned.",
+        )
 
     def _format_display_text(self, text: str) -> str:
         cleaned = text.replace("\ufb01", "fi").replace("\ufb02", "fl")
