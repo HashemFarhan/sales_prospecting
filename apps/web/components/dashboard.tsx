@@ -70,14 +70,7 @@ export function Dashboard() {
 
   return (
     <main className="min-h-screen bg-white text-slate-950">
-      <TopNavigation
-        providers={providers}
-        action={
-          <div className="rounded-[0.85rem] border border-black/10 bg-white px-4 py-2 text-sm text-black">
-            Internal Tool
-          </div>
-        }
-      />
+      <TopNavigation providers={providers} />
 
       <div className="flex w-full flex-col pt-[88px] xl:flex-row">
         <WorkspaceSidebar />
@@ -133,38 +126,38 @@ export function Dashboard() {
                           href={`/providers/${provider.id}`}
                           className="block border-b border-black/8 px-5 py-5 transition last:border-b-0 hover:bg-black/[0.02]"
                         >
-                          <div className="grid gap-5 xl:grid-cols-[minmax(320px,1.9fr)_140px_140px_150px_80px_130px] xl:items-start">
+                          <div className="grid gap-x-5 gap-y-4 xl:grid-cols-[minmax(280px,1.7fr)_minmax(110px,0.9fr)_minmax(110px,0.9fr)_minmax(140px,1fr)_minmax(72px,0.55fr)_minmax(110px,0.7fr)] xl:items-start">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-3">
                                 <div className="flex h-11 w-11 items-center justify-center rounded-[0.85rem] bg-[#206ef3]/10">
                                   <Building2 className="h-4 w-4 text-[#206ef3]" />
                                 </div>
-                                <h3 className="text-lg font-semibold tracking-tight text-black">{provider.doctor_name}</h3>
-                                <span className={`inline-flex rounded-[0.35rem] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] xl:ml-3 ${priority.tagClassName}`}>
+                                <h3 className="min-w-0 break-words text-lg font-semibold tracking-tight text-black">{provider.doctor_name}</h3>
+                                <span className={`inline-flex shrink-0 rounded-[0.35rem] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] xl:ml-1 ${priority.tagClassName}`}>
                                   {priority.label}
                                 </span>
                               </div>
-                              <p className="mt-2 text-sm text-black/55">{provider.clinic_or_hospital}</p>
+                              <p className="mt-2 break-words text-sm leading-6 text-black/55">{provider.clinic_or_hospital}</p>
                             </div>
                             <div className="min-w-0">
                               <div className="text-[11px] uppercase tracking-[0.22em] text-black/35">Last Note</div>
-                              <div className="mt-1 text-sm font-medium text-black">{formatDate(provider.latest_crm_note_date)}</div>
+                              <div className="mt-1 break-words text-sm font-medium text-black">{formatDate(provider.latest_crm_note_date)}</div>
                             </div>
                             <div className="min-w-0">
                               <div className="text-[11px] uppercase tracking-[0.22em] text-black/35">Region</div>
-                              <div className="mt-1 text-sm font-medium text-black">{provider.region}</div>
+                              <div className="mt-1 break-words text-sm font-medium text-black">{provider.region}</div>
                             </div>
                             <div className="min-w-0">
                               <div className="text-[11px] uppercase tracking-[0.22em] text-black/35">Specialty</div>
-                              <div className="mt-1 text-sm font-medium text-black">{provider.specialty}</div>
+                              <div className="mt-1 break-words text-sm font-medium text-black">{provider.specialty}</div>
                             </div>
                             <div className="min-w-0">
                               <div className="text-[11px] uppercase tracking-[0.22em] text-black/35">Size</div>
                               <div className="mt-1 text-sm font-medium text-black">{formatNumber(provider.size)}</div>
                             </div>
-                            <div className="flex items-start justify-between gap-3 xl:justify-end">
+                            <div className="flex min-w-0 items-start justify-between gap-3 xl:justify-end">
                               <div>
-                                <div className="text-sm font-medium text-[#206ef3]">View details</div>
+                                <div className="break-words text-sm font-medium text-[#206ef3]">View details</div>
                               </div>
                               <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[#206ef3]" />
                             </div>

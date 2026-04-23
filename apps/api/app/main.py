@@ -6,7 +6,7 @@ from app.db.session import create_tables
 from app.db.seed import seed_demo_state
 
 app = FastAPI(
-    title="Tempus Sales Copilot API",
+    title="Tempus Sales",
     version="0.1.0",
     description="Backend orchestration service for provider ranking, objection handling, and meeting script generation.",
 )

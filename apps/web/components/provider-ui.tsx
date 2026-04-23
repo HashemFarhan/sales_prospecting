@@ -345,7 +345,7 @@ export function TopNavigation(props: { action?: ReactNode; providers?: ProviderS
   return (
     <>
       <header className="fixed inset-x-0 top-0 z-40 flex h-[88px] w-full items-center justify-between gap-4 border-b border-white/10 bg-[rgba(0,0,0,0.84)] px-6 py-5 text-white backdrop-blur-xl">
-        <div className="text-[2rem] font-semibold tracking-tight text-white">Tempus</div>
+        <div className="text-[2rem] font-semibold tracking-tight text-white">TEMPEST</div>
         <button
           type="button"
           onClick={() => setIsOpen(true)}
