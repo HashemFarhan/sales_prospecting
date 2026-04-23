@@ -89,6 +89,14 @@ function hasDisplayableGeneratedOutput(output: GeneratedOutputResponse | null) {
   return Boolean(output.meeting_script?.trim()) && Boolean(output.objection_handler?.trim());
 }
 
+function buildPreview(text: string, maxLength = 140) {
+  const normalized = text.replace(/\s+/g, " ").trim();
+  if (normalized.length <= maxLength) {
+    return normalized;
+  }
+  return `${normalized.slice(0, maxLength).trimEnd()}...`;
+}
+
 export function ProviderDetailPage(props: { providerId: string }) {
   const [providers, setProviders] = useState<ProviderSummary[]>([]);
   const [workspace, setWorkspace] = useState<ProviderWorkspaceResponse | null>(null);
@@ -101,6 +109,7 @@ export function ProviderDetailPage(props: { providerId: string }) {
   const [isGeneratingOutput, startGeneratingTransition] = useTransition();
   const [isRegeneratingPitch, setIsRegeneratingPitch] = useState(false);
   const [currentPitchSlide, setCurrentPitchSlide] = useState(0);
+  const [activeProductIndex, setActiveProductIndex] = useState(0);
 
   useEffect(() => {
     void getProviders().then(setProviders).catch(() => {});
@@ -220,7 +229,16 @@ export function ProviderDetailPage(props: { providerId: string }) {
   }, [props.providerId, displayableGeneratedOutput?.meeting_script]);
   const crmRecords = workspace?.provider.crm_records.slice(0, 4) ?? [];
   const topProducts = workspace?.top_matched_products.slice(0, 3) ?? [];
-  const topEvidence = evidence.slice(0, 2);
+  const activeProduct = topProducts[activeProductIndex] ?? topProducts[0] ?? null;
+  const activeProductEvidence = activeProduct
+    ? evidence.filter((snippet) => snippet.product_id === activeProduct.product_id)
+    : [];
+  const activeEvidence = activeProductEvidence[0] ?? evidence[0] ?? null;
+  const topEvidenceCount = activeProductEvidence.length || evidence.length;
+
+  useEffect(() => {
+    setActiveProductIndex(0);
+  }, [props.providerId, workspace?.provider.id, topProducts.length]);
 
   return (
     <main className="app-shell min-h-screen text-slate-950">
@@ -456,6 +474,128 @@ export function ProviderDetailPage(props: { providerId: string }) {
                 </div>
               </section>
 
+              <section className="panel-surface rounded-[1.2rem] p-6">
+                <div className="flex items-center justify-between gap-3 border-b border-slate-200/80 pb-5">
+                  <div>
+                    <div className="flex items-center gap-2 text-sm font-medium text-slate-950">
+                      <Gauge className="h-4 w-4 text-slate-700" />
+                      Product-fit Workspace
+                    </div>
+                    <h2 className="mt-1 text-[1.9rem] font-semibold tracking-tight text-slate-950">Product-fit Workspace</h2>
+                  </div>
+                </div>
+
+                <div className="mt-5 space-y-6">
+                  <div className="grid gap-4 lg:grid-cols-[320px_minmax(0,1fr)]">
+                    <div className="space-y-3">
+                      <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Top product shortlist</div>
+                      {topProducts.map((match, index) => {
+                        const isActive = (topProducts[activeProductIndex] ?? topProducts[0])?.product_id === match.product_id;
+                        return (
+                          <button
+                            key={match.product_id}
+                            type="button"
+                            onClick={() => setActiveProductIndex(index)}
+                            className={`w-full rounded-[1rem] border p-4 text-left transition ${
+                              isActive
+                                ? "text-white shadow-[0_16px_32px_rgba(32,110,243,0.18)]"
+                                : "panel-subtle border-slate-200 text-slate-950 hover:border-slate-300"
+                            }`}
+                            style={isActive ? { backgroundColor: "#206ef3", borderColor: "#206ef3" } : undefined}
+                          >
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="min-w-0">
+                                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Product {index + 1}</div>
+                                <div className={`mt-1 text-sm font-semibold ${isActive ? "text-white" : "text-slate-950"}`}>{match.product_name}</div>
+                              </div>
+                              <div className={`rounded-full px-3 py-1 text-sm font-medium ${isActive ? "bg-white text-slate-950" : "border border-slate-900 bg-slate-950 text-white"}`}>
+                                {match.llm_relevance_score.toFixed(2)}
+                              </div>
+                            </div>
+                            <p className={`mt-3 text-sm leading-6 ${isActive ? "text-slate-300" : "text-slate-500"}`}>
+                              {buildPreview(match.llm_reasoning, 120)}
+                            </p>
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    <div className="panel-subtle rounded-[1rem] p-5 self-start">
+                      {activeProduct ? (
+                        <div className="space-y-5">
+                          <div className="flex flex-col gap-3 xl:flex-row xl:items-start xl:justify-between">
+                            <div>
+                              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Best-fit recommendation</div>
+                              <h3 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">{activeProduct.product_name}</h3>
+                            </div>
+                            <div className="rounded-full border border-slate-900 bg-slate-950 px-3 py-1 text-sm font-medium text-white">
+                              {activeProduct.llm_relevance_score.toFixed(2)}
+                            </div>
+                          </div>
+
+                          <div className="grid gap-3 xl:grid-cols-[minmax(0,1.2fr)_minmax(280px,0.8fr)]">
+                            <div className="rounded-[0.95rem] border border-slate-200 bg-white p-4">
+                              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Why this is a fit</div>
+                              <p className="mt-3 text-sm leading-7 text-slate-700">{activeProduct.llm_reasoning}</p>
+                            </div>
+
+                            <div className="grid gap-3">
+                              <div className="rounded-[0.9rem] border border-slate-200 bg-white p-4">
+                                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Product summary</div>
+                                <p className="mt-2 text-sm leading-6 text-slate-600">{activeProduct.description}</p>
+                              </div>
+                              <div className="rounded-[0.9rem] border border-slate-200 bg-white p-4">
+                                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Scoring signals</div>
+                                <div className="mt-2 flex flex-wrap gap-2">
+                                  <span className="rounded-full border border-slate-200 bg-slate-50 px-3 py-1 text-xs font-medium uppercase tracking-[0.16em] text-slate-600">
+                                    Semantic {activeProduct.interest_embedding_similarity.toFixed(3)}
+                                  </span>
+                                  <span
+                                    className="rounded-full border px-3 py-1 text-xs font-medium uppercase tracking-[0.16em]"
+                                    style={{ borderColor: "#bfd7ff", backgroundColor: "#eff6ff", color: "#206ef3" }}
+                                  >
+                                    {activeProduct.evaluation_source}
+                                  </span>
+                                </div>
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="rounded-[1rem] border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)] p-5">
+                            {activeEvidence ? (
+                              <div className="rounded-[0.9rem] border border-slate-200 bg-white p-4">
+                                <div className="flex flex-col gap-2 border-b border-slate-200 pb-3 sm:flex-row sm:items-center sm:justify-between">
+                                  <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Evidence excerpt</div>
+                                  <div className="text-sm font-medium text-slate-950">{activeEvidence.source_document}</div>
+                                </div>
+                                <div className="pt-3 text-sm leading-7 text-slate-700">
+                                  {activeEvidence.display_text ?? activeEvidence.chunk_text}
+                                </div>
+                              </div>
+                            ) : (
+                              <div className="rounded-[0.8rem] border border-slate-300 bg-white p-4 text-sm text-slate-500">
+                                No supporting evidence available yet.
+                              </div>
+                            )}
+
+                            {generatedOutput && evidence.length === 0 ? (
+                              <div className="mt-3 rounded-[0.8rem] border border-slate-300 bg-white p-4 text-sm text-slate-500">
+                                Loading supporting evidence...
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ) : (
+                        <div className="rounded-[0.8rem] border border-slate-300 bg-white p-4 text-sm text-slate-500">
+                          No product matches available yet.
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                </div>
+              </section>
+
               <section className="grid gap-6 xl:grid-cols-[minmax(0,1.12fr)_minmax(320px,0.88fr)]">
                 <div className="space-y-6">
                   <div className="panel-surface rounded-[1.2rem] p-6">
@@ -532,74 +672,61 @@ export function ProviderDetailPage(props: { providerId: string }) {
                         </div>
                         <div className="panel-subtle rounded-[1rem] p-4">
                           <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Evidence ready</div>
-                          <div className="mt-2 text-base font-semibold text-slate-950">{topEvidence.length}</div>
+                          <div className="mt-2 text-base font-semibold text-slate-950">{topEvidenceCount}</div>
                         </div>
                       </div>
                     </div>
                   </div>
 
-                  <div className="panel-surface rounded-[1.2rem] p-6">
-                    <div className="flex items-center gap-2 text-sm font-medium text-slate-950">
-                      <Gauge className="h-4 w-4 text-slate-700" />
-                      Product Fit And Evidence
-                    </div>
-                    <div className="mt-5 grid gap-4">
-                      {topProducts.map((match, index) => (
-                        <article key={match.product_id} className="panel-subtle rounded-[1rem] p-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <div>
-                              <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Product {index + 1}</div>
-                              <div className="mt-1 text-base font-semibold text-slate-950">{match.product_name}</div>
-                            </div>
-                            <div className="rounded-full border border-slate-900 bg-slate-950 px-3 py-1 text-sm font-medium text-white">
-                              {match.llm_relevance_score.toFixed(2)}
-                            </div>
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-slate-500">{match.description}</p>
-                          <p className="mt-3 text-sm leading-6 text-slate-700">{match.llm_reasoning}</p>
-                          <p className="mt-3 text-xs uppercase tracking-[0.18em] text-slate-400">
-                            Semantic {match.interest_embedding_similarity.toFixed(3)} | {match.evaluation_source}
-                          </p>
-                        </article>
-                      ))}
-                      {topEvidence.map((snippet) => (
-                        <article key={snippet.id} className="rounded-[1rem] border border-slate-200 bg-[linear-gradient(180deg,#f8fafc_0%,#f1f5f9_100%)] p-4">
-                          <div className="text-[11px] uppercase tracking-[0.22em] text-slate-500">
-                            {snippet.topic} | {snippet.section_title}
-                          </div>
-                          <p className="mt-2 text-sm leading-6 text-slate-700">{snippet.display_text ?? snippet.chunk_text}</p>
-                          <div className="mt-2 text-sm font-medium text-slate-950">{snippet.source_document}</div>
-                        </article>
-                      ))}
-                      {generatedOutput && evidence.length === 0 ? (
-                        <div className="rounded-[0.8rem] border border-slate-300 bg-white p-4 text-sm text-slate-500">
-                          Loading supporting evidence...
-                        </div>
-                      ) : null}
-                    </div>
-                  </div>
+                </div>
+              </section>
 
-                  <div className="panel-surface rounded-[1.2rem] p-6">
-                    <div className="flex items-center gap-2 text-sm font-medium text-slate-950">
-                      <CalendarDays className="h-4 w-4 text-slate-700" />
-                      Recent CRM Activity
-                    </div>
-                    <div className="mt-5 grid gap-4">
-                      {crmRecords.map((record) => (
-                        <article key={record.id} className="panel-subtle rounded-[1rem] p-4">
-                          <div className="flex items-center justify-between gap-3">
-                            <div className="text-sm font-semibold capitalize text-slate-950">{record.concern.replace(/-/g, " ")}</div>
-                            <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-slate-500">
-                              {formatDate(record.note_date)}
-                            </div>
-                          </div>
-                          <p className="mt-3 text-sm leading-6 text-slate-700">{record.interest_text}</p>
-                          <p className="mt-1 text-sm leading-6 text-slate-500">{record.note_text}</p>
-                        </article>
-                      ))}
-                    </div>
+              <section className="panel-surface rounded-[1.2rem] p-6">
+                <div className="flex flex-col gap-2 border-b border-slate-200/80 pb-4 sm:flex-row sm:items-center sm:justify-between">
+                  <div className="flex items-center gap-2 text-sm font-medium text-slate-950">
+                    <CalendarDays className="h-4 w-4 text-slate-700" />
+                    Recent CRM Activity
+                  </div>
+                  <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">
+                    {crmRecords.length} recent {crmRecords.length === 1 ? "entry" : "entries"}
                   </div>
                 </div>
+
+                {crmRecords.length ? (
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2 2xl:grid-cols-4">
+                    {crmRecords.map((record) => (
+                      <article key={record.id} className="panel-subtle flex min-h-[220px] flex-col rounded-[0.95rem] border border-slate-200 p-4">
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Concern</div>
+                            <div className="mt-1 text-base font-semibold capitalize tracking-tight text-slate-950">
+                              {record.concern.replace(/-/g, " ")}
+                            </div>
+                          </div>
+                          <div className="rounded-full border border-slate-200 bg-white px-3 py-1 text-[10px] uppercase tracking-[0.16em] text-slate-500">
+                            {formatDate(record.note_date)}
+                          </div>
+                        </div>
+
+                        <div className="mt-4 space-y-4">
+                          <div>
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Interest signal</div>
+                            <p className="mt-2 text-sm leading-6 text-slate-700">{record.interest_text}</p>
+                          </div>
+
+                          <div className="border-t border-slate-200 pt-4">
+                            <div className="text-[11px] uppercase tracking-[0.18em] text-slate-400">Latest note</div>
+                            <p className="mt-2 text-sm leading-6 text-slate-500">{record.note_text}</p>
+                          </div>
+                        </div>
+                      </article>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-5 rounded-[0.9rem] border border-slate-200 bg-white px-4 py-5 text-sm text-slate-500">
+                    No CRM activity available yet.
+                  </div>
+                )}
               </section>
             </div>
           )}

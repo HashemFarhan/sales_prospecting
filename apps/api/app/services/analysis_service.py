@@ -1,3 +1,4 @@
+import re
 from uuid import uuid4
 
 from app.models.entities import GeneratedOutput
@@ -100,12 +101,13 @@ class AnalysisService:
         if current_script:
             prompt_payload["current_script"] = current_script
         generated = self.openai_service.generate_sales_output(prompt_payload)
+        meeting_script = self._normalize_meeting_script(generated["meeting_script"])
         output = GeneratedOutput(
             id=str(uuid4()),
             provider_id=provider_id,
             top_product_ids=top_product_ids,
             objection_handler=generated["objection_handler"],
-            meeting_script=generated["meeting_script"],
+            meeting_script=meeting_script,
             supporting_snippets=generated["citations"],
             generation_source=generated["generation_source"],
             generation_notice=generated.get("generation_notice"),
@@ -292,3 +294,58 @@ class AnalysisService:
         return bool(output.meeting_script and output.meeting_script.strip()) and bool(
             output.objection_handler and output.objection_handler.strip()
         )
+
+    def _normalize_meeting_script(self, meeting_script: str) -> str:
+        defaults = ["Hook", "Value", "Close"]
+        raw_lines = [line.strip() for line in meeting_script.splitlines() if line.strip()]
+        stages: list[dict[str, str | int]] = []
+
+        for line in raw_lines:
+            match = re.match(
+                r"^(?:Stage\s*)?([1-3])[\).\:-]?\s*(Hook|Value|Close|Opening|Intro|Problem|Why Tempus|Recommendation|Ask)?\s*[:\-]?\s*(.*)$",
+                line,
+                re.IGNORECASE,
+            )
+            if match:
+                order = int(match.group(1)) - 1
+                raw_label = (match.group(2) or defaults[order]).strip()
+                label = self._normalize_stage_label(raw_label, defaults[order])
+                body = (match.group(3) or "").strip()
+                existing = next((item for item in stages if item["order"] == order), None)
+                if existing:
+                    existing["label"] = label
+                    if body:
+                        existing["body"] = f"{existing['body']} {body}".strip()
+                else:
+                    stages.append({"order": order, "label": label, "body": body})
+                continue
+
+            if stages:
+                stages[-1]["body"] = f"{stages[-1]['body']} {line}".strip()
+
+        normalized_stages = [item for item in sorted(stages, key=lambda item: int(item["order"])) if str(item["body"]).strip()]
+        if len(normalized_stages) == 3:
+            return "\n".join(
+                f"{int(item['order']) + 1}. {item['label']}: {str(item['body']).strip()}"
+                for item in normalized_stages
+            )
+
+        sentences = [
+            sentence.strip()
+            for sentence in re.split(r"(?<=[.!?])\s+", re.sub(r"\s+", " ", meeting_script).strip())
+            if sentence.strip()
+        ]
+        fallback = [
+            f"{index + 1}. {label}: {(sentences[index] if index < len(sentences) else '').strip()}".strip()
+            for index, label in enumerate(defaults)
+        ]
+        return "\n".join(line for line in fallback if not line.endswith(":"))
+
+    def _normalize_stage_label(self, raw_label: str, default_label: str) -> str:
+        if re.match(r"^opening|intro|problem$", raw_label, re.IGNORECASE):
+            return "Hook"
+        if re.match(r"^why tempus$", raw_label, re.IGNORECASE):
+            return "Value"
+        if re.match(r"^recommendation|ask$", raw_label, re.IGNORECASE):
+            return "Close"
+        return raw_label or default_label

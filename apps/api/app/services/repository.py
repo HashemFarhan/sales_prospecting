@@ -112,14 +112,29 @@ class SQLAlchemyRepository(Repository):
     def list_providers(self) -> list[ProviderSummary]:
         with SessionLocal() as session:
             rows = session.execute(
-                select(ProviderRecord, func.max(CRMRecordRecord.note_date))
+                select(
+                    ProviderRecord,
+                    func.max(CRMRecordRecord.note_date),
+                    ImpactRankingRecord.impact_score,
+                    ImpactRankingRecord.rank_reasoning,
+                )
                 .outerjoin(CRMRecordRecord, CRMRecordRecord.provider_id == ProviderRecord.id)
-                .group_by(ProviderRecord.id)
+                .outerjoin(ImpactRankingRecord, ImpactRankingRecord.provider_id == ProviderRecord.id)
+                .group_by(
+                    ProviderRecord.id,
+                    ImpactRankingRecord.impact_score,
+                    ImpactRankingRecord.rank_reasoning,
+                )
                 .order_by(ProviderRecord.doctor_name)
             ).all()
             return [
-                _provider_summary(_provider_from_record(record), latest_crm_note_date=latest_crm_note_date)
-                for record, latest_crm_note_date in rows
+                _provider_summary(
+                    _provider_from_record(record),
+                    latest_crm_note_date=latest_crm_note_date,
+                    impact_score=impact_score,
+                    rank_reasoning=rank_reasoning,
+                )
+                for record, latest_crm_note_date, impact_score, rank_reasoning in rows
             ]
 
     def get_provider(self, provider_id: str) -> Provider | None:
@@ -338,7 +353,7 @@ class SQLAlchemyRepository(Repository):
             session.commit()
 
 
-def _provider_summary(provider: Provider, latest_crm_note_date=None) -> ProviderSummary:
+def _provider_summary(provider: Provider, latest_crm_note_date=None, impact_score=None, rank_reasoning=None) -> ProviderSummary:
     return ProviderSummary(
         id=provider.id,
         doctor_name=provider.doctor_name,
@@ -347,6 +362,8 @@ def _provider_summary(provider: Provider, latest_crm_note_date=None) -> Provider
         size=provider.size,
         specialty=provider.specialty,
         latest_crm_note_date=latest_crm_note_date,
+        impact_score=impact_score,
+        rank_reasoning=rank_reasoning,
     )
 
 

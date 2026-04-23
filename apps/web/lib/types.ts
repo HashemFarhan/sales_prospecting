@@ -6,6 +6,8 @@ export type ProviderSummary = {
   size: number;
   specialty: string;
   latest_crm_note_date?: string | null;
+  impact_score?: number | null;
+  rank_reasoning?: string | null;
 };
 
 export type CRMRecord = {

@@ -4,6 +4,8 @@ These files are designed to work with the current ingestion endpoints and parser
 
 ## Files
 
+- `focused_genomics/`
+  Contains a fully aligned provider + CRM + product package centered on the main genomics products that should rank highest through normal embeddings and reranking.
 - `market_intelligence_providers.csv`
   Uses the exact columns the provider upload expects:
   `id,name,hospital_name,specialty,estimated_patient_volume,territory`
@@ -22,6 +24,8 @@ These files are designed to work with the current ingestion endpoints and parser
 1. Upload `market_intelligence_providers.csv`
 2. Upload either `crm_notes.csv` or `crm_notes_alt.txt`
 3. Upload `products.csv`
+
+For the strongest genomics-focused matching behavior, use the files inside `focused_genomics/` instead.
 
 ## Notes
 

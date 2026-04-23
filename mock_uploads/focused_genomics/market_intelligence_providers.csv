@@ -1,0 +1,7 @@
+id,name,hospital_name,specialty,estimated_patient_volume,territory
+prov-301,Dr. Maya Chen,Northshore Thoracic Molecular Center,Thoracic Oncology,425,Great Lakes
+prov-302,Dr. Leon Patel,Summit Precision Pathology Institute,Molecular Pathology,290,Great Lakes
+prov-303,Dr. Alina Brooks,Westbridge Breast Genomics Program,Breast Oncology,335,Midwest South
+prov-304,Dr. Victor Hale,Lakeside Solid Tumor Institute,Medical Oncology,360,Midwest North
+prov-305,Dr. Omar Singh,Regional Hematology Network,Hematology Oncology,275,Midwest North
+prov-306,Dr. Claire Novak,Riverbend Community Cancer Partners,Community Oncology,440,Midwest South

@@ -11,6 +11,8 @@ class ProviderSummary(BaseModel):
     size: int
     specialty: str
     latest_crm_note_date: date | None = None
+    impact_score: float | None = None
+    rank_reasoning: str | None = None
 
 
 class CRMRecordResponse(BaseModel):

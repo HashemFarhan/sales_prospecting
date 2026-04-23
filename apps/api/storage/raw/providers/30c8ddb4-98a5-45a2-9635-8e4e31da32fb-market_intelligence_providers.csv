@@ -1,7 +1,0 @@
-id,name,hospital_name,specialty,estimated_patient_volume,territory
-prov-201,Dr. Nina Alvarez,Lakeview Thoracic Precision Institute,Thoracic Oncology,410,Great Lakes
-prov-202,Dr. Samir Desai,Meridian Hematologic Oncology Center,Hematology Oncology,285,Midwest North
-prov-203,Dr. Rachel Kim,St. Catherine Lung Cancer Program,Thoracic Oncology,355,Great Lakes
-prov-204,Dr. Marcus Osei,Harbor Regional Molecular Pathology Network,Molecular Pathology,275,Great Lakes
-prov-205,Dr. Priya Shah,Oakridge Breast Precision Clinic,Breast Oncology,320,Midwest South
-prov-206,Dr. Ethan Cole,Riverbend Community Cancer Partners,Community Oncology,430,Midwest South

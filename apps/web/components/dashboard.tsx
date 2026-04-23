@@ -51,21 +51,29 @@ export function Dashboard() {
   }
 
   const filteredProviders = useMemo(() => {
-    const items: ProviderDrawerItem[] = providers.map((provider, index) => ({
+    const items: ProviderDrawerItem[] = providers.map((provider) => ({
       ...provider,
-      rank: index
+      impactScore: provider.impact_score ?? undefined,
+      rankReasoning: provider.rank_reasoning ?? undefined
     }));
-    return items;
+    return items.sort((left, right) => {
+      const leftScore = left.impactScore ?? left.impact_score ?? -1;
+      const rightScore = right.impactScore ?? right.impact_score ?? -1;
+      if (rightScore !== leftScore) {
+        return rightScore - leftScore;
+      }
+      return left.doctor_name.localeCompare(right.doctor_name);
+    });
   }, [providers]);
 
-  const highPriorityCount = filteredProviders.filter((provider) => getPriorityTone(provider).label === "High Priority").length;
+  const highPriorityCount = filteredProviders.filter((provider) => getPriorityTone(provider).label === "Priority").length;
 
   return (
     <main className="min-h-screen bg-white text-slate-950">
       <TopNavigation
         providers={providers}
         action={
-          <div className="rounded-full border border-black bg-black px-4 py-2 text-sm text-white">
+          <div className="rounded-[0.85rem] border border-black/10 bg-white px-4 py-2 text-sm text-black">
             Internal Tool
           </div>
         }
@@ -84,36 +92,36 @@ export function Dashboard() {
           ) : null}
 
           <div className="flex flex-col gap-6">
-            <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_360px]">
-              <div className="space-y-4">
-                <div className="grid gap-3 lg:grid-cols-3">
+            <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
+              <div className="space-y-6">
+                <div className="grid gap-3 rounded-[1.2rem] border border-black/8 bg-white p-5 lg:grid-cols-3">
                   <StatCard
                     label="Providers"
                     value={<AnimatedCounter value={providers.length} formatter={(value) => formatNumber(Math.round(value))} />}
                     helper="All records currently loaded."
-                    inverse
+                    className="border-0 shadow-none"
                   />
                   <StatCard
-                    label="High Priority"
+                    label="Priority"
                     value={<AnimatedCounter value={highPriorityCount} formatter={(value) => formatNumber(Math.round(value))} />}
-                    helper="Based on queue position."
-                    inverse
+                    helper="Based on impact scoring."
+                    className="border-0 shadow-none"
                   />
                   <StatCard
                     label="Latest Activity"
-                    value={providers[0] ? formatDate(providers[0].latest_crm_note_date) : "No data"}
+                    value={filteredProviders[0] ? formatDate(filteredProviders[0].latest_crm_note_date) : "No data"}
                     helper="Freshest CRM note across the queue."
-                    inverse
+                    className="border-0 shadow-none"
                   />
                 </div>
 
-                <section className="rounded-[0.9rem] border border-slate-300 bg-white">
-                  <div className="flex items-center justify-between border-b border-slate-300 px-5 py-4">
+                <section className="rounded-[1.2rem] border border-black/8 bg-white">
+                  <div className="flex items-center justify-between border-b border-black/8 px-5 py-4">
                     <div>
-                      <div className="text-[11px] uppercase tracking-[0.24em] text-slate-400">Providers</div>
-                      <h2 className="mt-1 text-2xl font-semibold tracking-tight text-slate-950">Queue</h2>
+                      <div className="text-[11px] uppercase tracking-[0.24em] text-black/35">Providers</div>
+                      <h2 className="mt-1 text-2xl font-semibold tracking-tight text-black">Queue</h2>
                     </div>
-                    <div className="text-sm text-slate-500">{filteredProviders.length} visible</div>
+                    <div className="text-sm text-black/45">{filteredProviders.length} visible</div>
                   </div>
 
                   <div className="space-y-0">
@@ -123,44 +131,42 @@ export function Dashboard() {
                         <Link
                           key={provider.id}
                           href={`/providers/${provider.id}`}
-                          className="block border-b border-slate-300 px-5 py-5 transition last:border-b-0 hover:bg-slate-50"
+                          className="block border-b border-black/8 px-5 py-5 transition last:border-b-0 hover:bg-black/[0.02]"
                         >
-                          <div className="flex flex-col gap-5 2xl:flex-row 2xl:items-center 2xl:justify-between">
+                          <div className="grid gap-5 xl:grid-cols-[minmax(320px,1.9fr)_140px_140px_150px_80px_130px] xl:items-start">
                             <div className="min-w-0">
                               <div className="flex flex-wrap items-center gap-3">
-                                <Building2 className="h-4 w-4 text-black" />
-                                <h3 className="text-lg font-semibold tracking-tight text-slate-950">{provider.doctor_name}</h3>
-                                <span className={`inline-flex rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-[0.16em] ${priority.tagClassName}`}>
+                                <div className="flex h-11 w-11 items-center justify-center rounded-[0.85rem] bg-[#206ef3]/10">
+                                  <Building2 className="h-4 w-4 text-[#206ef3]" />
+                                </div>
+                                <h3 className="text-lg font-semibold tracking-tight text-black">{provider.doctor_name}</h3>
+                                <span className={`inline-flex rounded-[0.35rem] px-2.5 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] xl:ml-3 ${priority.tagClassName}`}>
                                   {priority.label}
                                 </span>
                               </div>
-                              <p className="mt-2 text-sm text-slate-500">{provider.clinic_or_hospital}</p>
+                              <p className="mt-2 text-sm text-black/55">{provider.clinic_or_hospital}</p>
                             </div>
-
-                            <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-5">
+                            <div className="min-w-0">
+                              <div className="text-[11px] uppercase tracking-[0.22em] text-black/35">Last Note</div>
+                              <div className="mt-1 text-sm font-medium text-black">{formatDate(provider.latest_crm_note_date)}</div>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[11px] uppercase tracking-[0.22em] text-black/35">Region</div>
+                              <div className="mt-1 text-sm font-medium text-black">{provider.region}</div>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[11px] uppercase tracking-[0.22em] text-black/35">Specialty</div>
+                              <div className="mt-1 text-sm font-medium text-black">{provider.specialty}</div>
+                            </div>
+                            <div className="min-w-0">
+                              <div className="text-[11px] uppercase tracking-[0.22em] text-black/35">Size</div>
+                              <div className="mt-1 text-sm font-medium text-black">{formatNumber(provider.size)}</div>
+                            </div>
+                            <div className="flex items-start justify-between gap-3 xl:justify-end">
                               <div>
-                                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Last Note</div>
-                                <div className="mt-1 text-sm font-medium text-slate-900">{formatDate(provider.latest_crm_note_date)}</div>
+                                <div className="text-sm font-medium text-[#206ef3]">View details</div>
                               </div>
-                              <div>
-                                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Region</div>
-                                <div className="mt-1 text-sm font-medium text-slate-900">{provider.region}</div>
-                              </div>
-                              <div>
-                                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Specialty</div>
-                                <div className="mt-1 text-sm font-medium text-slate-900">{provider.specialty}</div>
-                              </div>
-                              <div>
-                                <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Size</div>
-                                <div className="mt-1 text-sm font-medium text-slate-900">{formatNumber(provider.size)}</div>
-                              </div>
-                              <div className="flex items-center justify-between gap-3 xl:justify-end">
-                                <div>
-                                  <div className="text-[11px] uppercase tracking-[0.22em] text-slate-400">Open</div>
-                                  <div className="mt-1 text-sm font-medium text-slate-900">View details</div>
-                                </div>
-                                <ArrowRight className="h-4 w-4 text-black" />
-                              </div>
+                              <ArrowRight className="mt-1 h-4 w-4 shrink-0 text-[#206ef3]" />
                             </div>
                           </div>
                         </Link>
@@ -174,16 +180,16 @@ export function Dashboard() {
                 </section>
               </div>
 
-              <aside className="rounded-[0.9rem] border border-slate-300 bg-white p-5">
+              <aside className="rounded-[1.2rem] border border-black/8 bg-white p-0 shadow-[0_12px_28px_rgba(17,17,17,0.04)]">
                 <div className="flex items-center justify-between">
-                  <div>
-                    <div className="text-sm font-medium text-slate-950">Data Intake</div>
-                    <p className="mt-1 text-sm text-slate-500">Manage imports from the queue view.</p>
+                  <div className="border-b border-black/8 px-5 py-5">
+                    <div className="text-2xl font-semibold text-black">Data Intake</div>
+                    <p className="mt-2 text-sm leading-6 text-black/55">Manage imports from the queue view.</p>
                   </div>
-                  <UploadCloud className="h-5 w-5 text-black" />
+                  <UploadCloud className="mr-5 h-5 w-5 text-[#206ef3]" />
                 </div>
 
-                <div className="mt-5 space-y-4">
+                <div className="space-y-4 p-5 pt-0">
                   <UploadPanel
                     title="Providers"
                     hint="CSV with doctor_name, clinic_or_hospital, region, size, and specialty."
@@ -210,7 +216,7 @@ export function Dashboard() {
                   />
                 </div>
 
-                <div className="mt-5 rounded-[0.9rem] border border-black bg-black p-4 text-white">
+                <div className="mx-5 mb-5 rounded-[1rem] border border-black bg-black p-4 text-white">
                   <div className="flex items-center gap-2 text-sm font-medium">
                     <Database className="h-4 w-4" />
                     Workspace Notes

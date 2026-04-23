@@ -7,3 +7,4 @@ python-multipart==0.0.20
 openai==1.75.0
 pgvector==0.3.6
 pypdf==5.4.0
+psycopg2-binary==2.9.10
