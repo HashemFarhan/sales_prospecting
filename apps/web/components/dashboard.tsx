@@ -128,8 +128,8 @@ export function Dashboard() {
                         >
                           <div className="grid gap-x-5 gap-y-4 xl:grid-cols-[minmax(280px,1.7fr)_minmax(110px,0.9fr)_minmax(110px,0.9fr)_minmax(140px,1fr)_minmax(72px,0.55fr)_minmax(110px,0.7fr)] xl:items-start">
                             <div className="min-w-0">
-                              <div className="flex flex-wrap items-center gap-3">
-                                <div className="flex h-11 w-11 items-center justify-center rounded-[0.85rem] bg-[#206ef3]/10">
+                              <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex h-11 w-11 items-center justify-center rounded-[0.85rem] bg-transparent">
                                   <Building2 className="h-4 w-4 text-[#206ef3]" />
                                 </div>
                                 <h3 className="min-w-0 break-words text-lg font-semibold tracking-tight text-black">{provider.doctor_name}</h3>
